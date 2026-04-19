@@ -1,0 +1,966 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>ACO-TSP Visualizer</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --surface2: #1c1c27;
+    --border: rgba(255,255,255,0.08);
+    --border-strong: rgba(255,255,255,0.18);
+    --text: #f0f0f5;
+    --muted: #8a8a9a;
+    --accent: #6c63ff;
+    --accent2: #ff6b6b;
+    --accent3: #43e07e;
+    --accent4: #ffd166;
+    --font-mono: 'Space Mono', monospace;
+    --font-sans: 'DM Sans', sans-serif;
+    --radius: 12px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Layout ── */
+  .app { display: grid; grid-template-rows: auto 1fr; min-height: 100vh; }
+
+  header {
+    padding: 20px 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: var(--surface);
+  }
+
+  .logo {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .logo span { color: var(--accent2); }
+
+  header h1 {
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--text);
+  }
+
+  .header-right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent3);
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .status-text { font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+
+  .main { display: grid; grid-template-columns: 340px 1fr; height: calc(100vh - 61px); overflow: hidden; }
+
+  /* ── Sidebar ── */
+  .sidebar {
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    padding: 24px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  /* ── Inputs ── */
+  label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 6px; }
+
+  input[type="number"], select, textarea {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 9px 12px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  input[type="number"]:focus, select:focus, textarea:focus {
+    border-color: var(--accent);
+  }
+
+  select option { background: var(--surface2); }
+
+  textarea {
+    resize: vertical;
+    min-height: 100px;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.8;
+  }
+
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  /* ── Buttons ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #fff;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: #7c74ff; transform: translateY(-1px); }
+  .btn-primary:active:not(:disabled) { transform: translateY(0); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid var(--border);
+    font-size: 13px;
+    flex: 1;
+  }
+
+  .btn-ghost:hover { background: var(--surface2); color: var(--text); border-color: var(--border-strong); }
+
+  .btn-icon {
+    padding: 8px;
+    background: var(--surface2);
+    color: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .btn-icon:hover { color: var(--text); border-color: var(--border-strong); }
+
+  .btn-row { display: flex; gap: 8px; }
+
+  /* ── Algo Tags ── */
+  .algo-selector { display: flex; flex-direction: column; gap: 8px; }
+
+  .algo-opt {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+    background: var(--surface2);
+  }
+
+  .algo-opt.active { border-color: var(--accent); background: rgba(108,99,255,0.1); }
+  .algo-opt:hover:not(.active) { border-color: var(--border-strong); }
+
+  .algo-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .algo-name { font-size: 13px; font-weight: 500; }
+  .algo-desc { font-size: 11px; color: var(--muted); margin-left: auto; font-family: var(--font-mono); }
+
+  /* ── Canvas area ── */
+  .content {
+    display: grid;
+    grid-template-rows: 1fr auto;
+    overflow: hidden;
+  }
+
+  .canvas-area {
+    position: relative;
+    overflow: hidden;
+    background: var(--bg);
+    background-image:
+      linear-gradient(rgba(108,99,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(108,99,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+
+  #main-canvas { display: block; width: 100%; height: 100%; }
+
+  .canvas-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .empty-state {
+    text-align: center;
+    pointer-events: none;
+  }
+
+  .empty-state svg { opacity: 0.15; margin-bottom: 16px; }
+  .empty-state p { color: var(--muted); font-size: 14px; }
+
+  /* ── Results bar ── */
+  .results-bar {
+    border-top: 1px solid var(--border);
+    background: var(--surface);
+    padding: 0 24px;
+    display: flex;
+    gap: 0;
+    overflow-x: auto;
+  }
+
+  .result-card {
+    padding: 16px 24px;
+    border-right: 1px solid var(--border);
+    min-width: 180px;
+    cursor: pointer;
+    transition: background 0.15s;
+    flex-shrink: 0;
+  }
+
+  .result-card:hover { background: var(--surface2); }
+  .result-card.active { background: rgba(108,99,255,0.08); border-top: 2px solid var(--accent); }
+
+  .result-algo {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .result-dist {
+    font-size: 22px;
+    font-weight: 600;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+
+  .result-time {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: var(--font-mono);
+  }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); padding: 0 20px; }
+
+  .tab {
+    padding: 12px 16px;
+    font-size: 13px;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+    margin-bottom: -1px;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-family: var(--font-sans);
+  }
+
+  .tab.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab:hover:not(.active) { color: var(--text); }
+
+  /* ── Convergence chart ── */
+  #conv-chart-wrap { padding: 16px 20px; }
+
+  /* ── Loading ── */
+  .loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(10,10,15,0.85);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 10;
+  }
+
+  .spinner {
+    width: 48px;
+    height: 48px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--muted);
+    animation: blink 1.2s step-end infinite;
+  }
+
+  @keyframes blink { 50% { opacity: 0.3; } }
+
+  /* ── Tooltip ── */
+  .tooltip {
+    position: absolute;
+    background: var(--surface2);
+    border: 1px solid var(--border-strong);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 20;
+    transition: opacity 0.1s;
+    font-family: var(--font-mono);
+    white-space: nowrap;
+  }
+
+  /* ── Coord list ── */
+  .coord-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 10px 4px 8px;
+    font-size: 12px;
+    font-family: var(--font-mono);
+    margin: 3px;
+    cursor: pointer;
+    transition: border-color 0.12s;
+  }
+
+  .coord-pill:hover { border-color: var(--accent2); }
+
+  .coord-num {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+  }
+
+  .badge-winner { background: rgba(67,224,126,0.15); color: var(--accent3); }
+
+  /* ── Error ── */
+  .error-banner {
+    background: rgba(255,107,107,0.1);
+    border: 1px solid rgba(255,107,107,0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--accent2);
+    margin-top: 8px;
+  }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="logo">ACO<span>/</span>TSP</div>
+    <h1>Ant Colony Optimization — Traveling Salesman</h1>
+    <div class="header-right">
+      <div class="status-dot" id="api-dot" style="background:#ff6b6b"></div>
+      <span class="status-text" id="api-status">disconnected</span>
+    </div>
+  </header>
+
+  <div class="main">
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+
+      <!-- API URL -->
+      <div>
+        <div class="section-label">API endpoint</div>
+        <input type="text" id="api-url" value="http://localhost:5000" style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:9px 12px;font-family:var(--font-mono);font-size:12px;outline:none;" />
+      </div>
+
+      <!-- Cities -->
+      <div>
+        <div class="section-label">Cities</div>
+        <div class="btn-row" style="margin-bottom:10px">
+          <button class="btn btn-ghost" onclick="generateRandom()">&#9854; Random</button>
+          <button class="btn btn-ghost" onclick="clearCities()">&#10006; Clear</button>
+        </div>
+        <label>Number of random cities</label>
+        <input type="number" id="n-cities" value="12" min="3" max="30" style="margin-bottom:10px" />
+        <label>Manual input (x,y per line)</label>
+        <textarea id="coord-input" placeholder="20.5, 34.1&#10;80.2, 12.9&#10;55.0, 70.3"></textarea>
+        <div id="coord-pills" style="margin-top:8px"></div>
+      </div>
+
+      <!-- Algorithm -->
+      <div>
+        <div class="section-label">Algorithm</div>
+        <div class="algo-selector">
+          <div class="algo-opt active" data-algo="all" onclick="selectAlgo(this)">
+            <div class="algo-dot" style="background:linear-gradient(135deg,#6c63ff,#ff6b6b,#43e07e)"></div>
+            <span class="algo-name">Compare all</span>
+            <span class="algo-desc">3x</span>
+          </div>
+          <div class="algo-opt" data-algo="ant_system" onclick="selectAlgo(this)">
+            <div class="algo-dot" style="background:#6c63ff"></div>
+            <span class="algo-name">Ant System</span>
+            <span class="algo-desc">AS</span>
+          </div>
+          <div class="algo-opt" data-algo="elitist" onclick="selectAlgo(this)">
+            <div class="algo-dot" style="background:#ff6b6b"></div>
+            <span class="algo-name">Elitist AS</span>
+            <span class="algo-desc">EAS</span>
+          </div>
+          <div class="algo-opt" data-algo="rank_based" onclick="selectAlgo(this)">
+            <div class="algo-dot" style="background:#43e07e"></div>
+            <span class="algo-name">Rank-Based AS</span>
+            <span class="algo-desc">ASrank</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Params -->
+      <div>
+        <div class="section-label">Parameters</div>
+        <div class="row">
+          <div>
+            <label>Iterations</label>
+            <input type="number" id="p-iter" value="50" min="10" max="500" />
+          </div>
+          <div>
+            <label>Ants</label>
+            <input type="number" id="p-ants" value="10" min="2" max="100" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Run -->
+      <div>
+        <button class="btn btn-primary" id="run-btn" onclick="runOptimize()">
+          &#9654; Run Optimization
+        </button>
+        <div id="error-box"></div>
+      </div>
+
+    </aside>
+
+    <!-- ── Canvas + Results ── -->
+    <div class="content">
+      <!-- Tabs for main/convergence -->
+      <div style="display:flex;flex-direction:column;height:100%;overflow:hidden">
+        <div class="tabs">
+          <button class="tab active" id="tab-path" onclick="switchTab('path')">Path Visualization</button>
+          <button class="tab" id="tab-conv" onclick="switchTab('conv')">Convergence</button>
+        </div>
+
+        <!-- Path canvas -->
+        <div id="view-path" class="canvas-area" style="flex:1;position:relative;overflow:hidden">
+          <canvas id="main-canvas"></canvas>
+          <div class="canvas-overlay" id="empty-overlay">
+            <div class="empty-state">
+              <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+                <circle cx="12" cy="12" r="5" fill="#6c63ff"/>
+                <circle cx="52" cy="18" r="5" fill="#ff6b6b"/>
+                <circle cx="32" cy="50" r="5" fill="#43e07e"/>
+                <circle cx="8" cy="44" r="5" fill="#ffd166"/>
+                <circle cx="54" cy="46" r="5" fill="#6c63ff"/>
+                <line x1="12" y1="12" x2="52" y2="18" stroke="white" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <line x1="52" y1="18" x2="32" y2="50" stroke="white" stroke-width="1.5" stroke-dasharray="4 3"/>
+                <line x1="32" y1="50" x2="8" y2="44" stroke="white" stroke-width="1.5" stroke-dasharray="4 3"/>
+              </svg>
+              <p>Add cities and click Run Optimization</p>
+            </div>
+          </div>
+          <div class="loading-overlay" id="loading" style="display:none">
+            <div class="spinner"></div>
+            <div class="loading-text" id="loading-msg">Running ants...</div>
+          </div>
+          <div class="tooltip" id="tooltip" style="display:none"></div>
+        </div>
+
+        <!-- Convergence view -->
+        <div id="view-conv" style="display:none;flex:1;overflow:auto;background:var(--bg)">
+          <div id="conv-chart-wrap" style="height:100%">
+            <canvas id="conv-canvas" style="width:100%;height:100%"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <!-- Results bar -->
+      <div class="results-bar" id="results-bar" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+/* ─── State ──────────────────────────────────────────────────────────────── */
+let coords = [];
+let results = [];
+let activeResult = 0;
+let selectedAlgo = 'all';
+let convChart = null;
+let animFrame = null;
+let animStep = 0;
+let ANIM_SPEED = 18; // ms per edge
+
+const COLORS = {
+  ant_system:  '#6c63ff',
+  elitist:     '#ff6b6b',
+  rank_based:  '#43e07e',
+};
+
+const LABELS = {
+  ant_system:  'ANT SYSTEM',
+  elitist:     'ELITIST AS',
+  rank_based:  'RANK-BASED AS',
+};
+
+/* ─── API health check ───────────────────────────────────────────────────── */
+async function checkAPI() {
+  const url = document.getElementById('api-url').value.trim();
+  try {
+    const r = await fetch(url + '/', { signal: AbortSignal.timeout(2000) });
+    const ok = r.ok;
+    document.getElementById('api-dot').style.background = ok ? '#43e07e' : '#ff6b6b';
+    document.getElementById('api-status').textContent = ok ? 'connected' : 'error ' + r.status;
+  } catch {
+    document.getElementById('api-dot').style.background = '#ff6b6b';
+    document.getElementById('api-status').textContent = 'unreachable';
+  }
+}
+checkAPI();
+setInterval(checkAPI, 5000);
+
+/* ─── Algorithm selector ─────────────────────────────────────────────────── */
+function selectAlgo(el) {
+  document.querySelectorAll('.algo-opt').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  selectedAlgo = el.dataset.algo;
+}
+
+/* ─── Coordinate management ──────────────────────────────────────────────── */
+function generateRandom() {
+  const n = parseInt(document.getElementById('n-cities').value) || 12;
+  coords = Array.from({length: n}, () => [
+    parseFloat((Math.random() * 90 + 5).toFixed(1)),
+    parseFloat((Math.random() * 90 + 5).toFixed(1)),
+  ]);
+  syncCoordsToTextarea();
+  renderPills();
+  drawEmpty();
+}
+
+function clearCities() {
+  coords = [];
+  document.getElementById('coord-input').value = '';
+  document.getElementById('coord-pills').innerHTML = '';
+  drawEmpty();
+}
+
+function syncCoordsToTextarea() {
+  document.getElementById('coord-input').value = coords.map(c => c.join(', ')).join('\n');
+}
+
+function parseCoordsFromTextarea() {
+  const lines = document.getElementById('coord-input').value.trim().split('\n');
+  const parsed = [];
+  for (const line of lines) {
+    const parts = line.split(',').map(s => parseFloat(s.trim()));
+    if (parts.length === 2 && !parts.some(isNaN)) parsed.push(parts);
+  }
+  return parsed;
+}
+
+document.getElementById('coord-input').addEventListener('input', () => {
+  coords = parseCoordsFromTextarea();
+  renderPills();
+  drawEmpty();
+});
+
+function renderPills() {
+  const box = document.getElementById('coord-pills');
+  box.innerHTML = '';
+  coords.slice(0, 20).forEach((c, i) => {
+    const pill = document.createElement('span');
+    pill.className = 'coord-pill';
+    pill.innerHTML = `<span class="coord-num">${i}</span>${c[0].toFixed(1)}, ${c[1].toFixed(1)}`;
+    box.appendChild(pill);
+  });
+  if (coords.length > 20) {
+    const more = document.createElement('span');
+    more.style.cssText = 'font-size:12px;color:var(--muted);padding:4px 6px';
+    more.textContent = `+${coords.length - 20} more`;
+    box.appendChild(more);
+  }
+}
+
+function drawEmpty() {
+  const canvas = document.getElementById('main-canvas');
+  const parent = canvas.parentElement;
+  canvas.width = parent.clientWidth;
+  canvas.height = parent.clientHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (coords.length === 0) {
+    document.getElementById('empty-overlay').style.display = 'flex';
+    return;
+  }
+  document.getElementById('empty-overlay').style.display = 'none';
+  drawCitiesOnly(ctx, canvas.width, canvas.height);
+}
+
+function drawCitiesOnly(ctx, W, H) {
+  const pad = 50;
+  const pts = projectCoords(coords, W, H, pad);
+  pts.forEach((p, i) => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = '#6c63ff';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '11px Space Mono';
+    ctx.fillText(i, p.x + 9, p.y + 4);
+  });
+}
+
+/* ─── Projection ─────────────────────────────────────────────────────────── */
+function projectCoords(coords, W, H, pad) {
+  const xs = coords.map(c => c[0]);
+  const ys = coords.map(c => c[1]);
+  const minX = Math.min(...xs), maxX = Math.max(...xs);
+  const minY = Math.min(...ys), maxY = Math.max(...ys);
+  const rangeX = maxX - minX || 1, rangeY = maxY - minY || 1;
+  return coords.map(c => ({
+    x: pad + ((c[0] - minX) / rangeX) * (W - 2 * pad),
+    y: pad + ((c[1] - minY) / rangeY) * (H - 2 * pad),
+  }));
+}
+
+/* ─── Run optimization ───────────────────────────────────────────────────── */
+async function runOptimize() {
+  const coordsParsed = parseCoordsFromTextarea();
+  if (coordsParsed.length < 3) {
+    showError('Add at least 3 cities.');
+    return;
+  }
+  coords = coordsParsed;
+
+  const url = document.getElementById('api-url').value.trim();
+  const iterations = parseInt(document.getElementById('p-iter').value);
+  const n_ants = parseInt(document.getElementById('p-ants').value);
+
+  clearError();
+  setLoading(true);
+  document.getElementById('results-bar').style.display = 'none';
+
+  try {
+    const resp = await fetch(url + '/optimize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coords, algorithm: selectedAlgo, iterations, n_ants }),
+    });
+
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.error || 'Server error');
+
+    results = data.results;
+    activeResult = 0;
+    renderResults();
+    animatePath(0);
+    if (convChart) convChart.destroy();
+    renderConvergence();
+
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+/* ─── Render results bar ─────────────────────────────────────────────────── */
+function renderResults() {
+  const bar = document.getElementById('results-bar');
+  bar.style.display = 'flex';
+
+  // Find best (lowest distance)
+  const bestDist = Math.min(...results.map(r => r.best_distance));
+
+  bar.innerHTML = results.map((r, i) => {
+    const color = COLORS[r.algorithm] || '#6c63ff';
+    const isWinner = results.length > 1 && r.best_distance === bestDist;
+    return `
+      <div class="result-card ${i === activeResult ? 'active' : ''}" onclick="setActive(${i})" style="border-top: 2px solid ${i === activeResult ? color : 'transparent'}">
+        <div class="result-algo" style="color:${color}">${LABELS[r.algorithm] || r.algorithm}
+          ${isWinner ? '<span class="badge badge-winner" style="margin-left:6px">BEST</span>' : ''}
+        </div>
+        <div class="result-dist">${r.best_distance.toFixed(1)}</div>
+        <div class="result-time">${r.exec_time.toFixed(3)}s &middot; ${r.best_path.length} cities</div>
+      </div>
+    `;
+  }).join('');
+}
+
+function setActive(i) {
+  activeResult = i;
+  renderResults();
+  animatePath(i);
+}
+
+/* ─── Animate path ───────────────────────────────────────────────────────── */
+function animatePath(resultIdx) {
+  if (animFrame) cancelAnimationFrame(animFrame);
+
+  const canvas = document.getElementById('main-canvas');
+  const parent = document.getElementById('view-path');
+  canvas.width = parent.clientWidth;
+  canvas.height = parent.clientHeight;
+
+  const ctx = canvas.getContext('2d');
+  const res = results[resultIdx];
+  if (!res) return;
+
+  const W = canvas.width, H = canvas.height;
+  const pad = 60;
+  const pts = projectCoords(coords, W, H, pad);
+  const path = res.best_path;
+  const color = COLORS[res.algorithm] || '#6c63ff';
+
+  let step = 0;
+  const totalEdges = path.length;
+
+  function frame() {
+    ctx.clearRect(0, 0, W, H);
+
+    // Draw all edges faintly
+    ctx.globalAlpha = 0.08;
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < path.length; i++) {
+      const a = pts[path[i]], b = pts[path[(i+1) % path.length]];
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // Draw completed edges
+    for (let i = 0; i < Math.min(step, totalEdges); i++) {
+      const a = pts[path[i]], b = pts[path[(i+1) % path.length]];
+      const progress = i < step - 1 ? 1 : (step % 1);
+
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      if (i === Math.floor(step) - 1 && step % 1 > 0) {
+        ctx.lineTo(a.x + (b.x - a.x) * progress, a.y + (b.y - a.y) * progress);
+      } else {
+        ctx.lineTo(b.x, b.y);
+      }
+
+      const alpha = 0.4 + 0.6 * (i / totalEdges);
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = alpha;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+
+    // Draw cities
+    pts.forEach((p, i) => {
+      const inPath = step >= path.indexOf(i) + 1;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, inPath ? 7 : 5, 0, Math.PI * 2);
+      ctx.fillStyle = inPath ? color : '#2a2a3a';
+      ctx.fill();
+      ctx.strokeStyle = inPath ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.font = '10px Space Mono';
+      ctx.fillText(i, p.x + 10, p.y + 4);
+    });
+
+    // Highlight start
+    const startPt = pts[path[0]];
+    ctx.beginPath();
+    ctx.arc(startPt.x, startPt.y, 10, 0, Math.PI * 2);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    if (step < totalEdges) {
+      step += 0.3;
+      animFrame = requestAnimationFrame(frame);
+    } else {
+      // Draw final distance label
+      ctx.fillStyle = 'rgba(255,255,255,0.6)';
+      ctx.font = '13px Space Mono';
+      ctx.fillText(`dist: ${res.best_distance.toFixed(2)}`, 16, H - 16);
+    }
+  }
+
+  frame();
+}
+
+/* ─── Convergence chart ──────────────────────────────────────────────────── */
+function renderConvergence() {
+  const canvas = document.getElementById('conv-canvas');
+  if (convChart) convChart.destroy();
+
+  const datasets = results.map(r => ({
+    label: LABELS[r.algorithm] || r.algorithm,
+    data: r.convergence,
+    borderColor: COLORS[r.algorithm] || '#6c63ff',
+    backgroundColor: 'transparent',
+    borderWidth: 2,
+    pointRadius: 0,
+    tension: 0.4,
+  }));
+
+  const labels = results[0]?.convergence.map((_, i) => i + 1) || [];
+
+  convChart = new Chart(canvas, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      animation: { duration: 600 },
+      plugins: {
+        legend: { display: true, labels: { color: '#8a8a9a', font: { family: 'Space Mono', size: 11 }, boxWidth: 16, padding: 20 } },
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#8a8a9a', font: { family: 'Space Mono', size: 10 }, maxTicksLimit: 10 },
+          title: { display: true, text: 'Iteration', color: '#8a8a9a', font: { family: 'Space Mono', size: 11 } },
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#8a8a9a', font: { family: 'Space Mono', size: 10 } },
+          title: { display: true, text: 'Best Distance', color: '#8a8a9a', font: { family: 'Space Mono', size: 11 } },
+        },
+      },
+    },
+  });
+}
+
+/* ─── Tabs ───────────────────────────────────────────────────────────────── */
+function switchTab(tab) {
+  document.getElementById('tab-path').classList.toggle('active', tab === 'path');
+  document.getElementById('tab-conv').classList.toggle('active', tab === 'conv');
+  document.getElementById('view-path').style.display = tab === 'path' ? 'block' : 'none';
+  document.getElementById('view-conv').style.display = tab === 'conv' ? 'flex' : 'none';
+
+  if (tab === 'path' && results.length) {
+    setTimeout(() => animatePath(activeResult), 50);
+  }
+  if (tab === 'conv' && results.length) {
+    setTimeout(() => renderConvergence(), 50);
+  }
+}
+
+/* ─── UI helpers ─────────────────────────────────────────────────────────── */
+function setLoading(on) {
+  document.getElementById('loading').style.display = on ? 'flex' : 'none';
+  document.getElementById('run-btn').disabled = on;
+  if (on) {
+    const msgs = ['Deploying ants...', 'Laying pheromone trails...', 'Evaporating & updating...', 'Converging on solution...'];
+    let i = 0;
+    window._loadingInterval = setInterval(() => {
+      document.getElementById('loading-msg').textContent = msgs[i % msgs.length];
+      i++;
+    }, 900);
+  } else {
+    clearInterval(window._loadingInterval);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('error-box').innerHTML = `<div class="error-banner">&#9888; ${msg}</div>`;
+}
+
+function clearError() {
+  document.getElementById('error-box').innerHTML = '';
+}
+
+/* ─── Init ───────────────────────────────────────────────────────────────── */
+window.addEventListener('resize', () => {
+  if (results.length) animatePath(activeResult);
+  else drawEmpty();
+});
+
+generateRandom();
+</script>
+</body>
+</html>
